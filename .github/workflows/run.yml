@@ -1,9 +1,9 @@
 name: Daily Google Maps Leads
 
 on:
-  # SCHEDULE TRIGGER: Runs automatically at 03:30 UTC, which is precisely 9:00 AM IST.
+  # SCHEDULE TRIGGER: Runs automatically at 01:30 UTC, which is precisely 7:00 AM IST.
   schedule:
-    - cron: "30 3 * * *"
+    - cron: "30 1 * * *"
   
   # MANUAL TRIGGER: Allows you to start the workflow anytime from the GitHub UI.
   workflow_dispatch:
@@ -32,6 +32,6 @@ jobs:
         run: |
           echo "Starting scheduled scraper execution."
           echo "Current time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
-          echo "Target run time (IST): 09:00 AM"
+          echo "Target run time (IST): 07:00 AM"
           python main.py
           echo "Scraper finished."
