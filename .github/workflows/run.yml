@@ -1,27 +1,35 @@
 name: Daily Google Maps Leads
 
 on:
+  # Cron runs at 03:10 UTC, which is precisely 08:40 AM IST (UTC+5:30)
   schedule:
-    - cron: "0 3 * * *"   # 8:30 AM IST (UTC+5:30)
+    - cron: "10 3 * * *"
   workflow_dispatch:
 
 jobs:
-  run-script:
+  run-scraper:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: 'pip' # Speeds up dependency installation
 
       - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run scraper
-        run: python main.py
+        # Use a custom environment variable to log the execution time in IST for clarity
+        env:
+          GHA_TZ: Asia/Kolkata 
+        run: |
+          echo "Starting scraper execution."
+          echo "Current time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "Expected run time (IST): 08:40 AM"
+          python main.py
+          echo "Scraper finished."
