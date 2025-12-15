@@ -1,35 +1,23 @@
-name: Daily Google Maps Leads
+name: Test - Every 1 Minute Trigger
 
 on:
-  # Cron runs at 03:10 UTC, which is precisely 08:40 AM IST (UTC+5:30)
+  # CRON schedule: Runs every 1 minute (The fastest schedule supported by GitHub Actions cron)
   schedule:
-    - cron: "10 3 * * *"
+    - cron: "*/1 * * * *"
+  # Keep workflow_dispatch for immediate manual testing
   workflow_dispatch:
 
 jobs:
-  run-scraper:
+  test-run:
     runs-on: ubuntu-latest
+    timeout-minutes: 5 # Ensure it doesn't run too long if something hangs
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: 'pip' # Speeds up dependency installation
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run scraper
-        # Use a custom environment variable to log the execution time in IST for clarity
-        env:
-          GHA_TZ: Asia/Kolkata 
+      - name: Log Current Time
         run: |
-          echo "Starting scraper execution."
-          echo "Current time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')"
-          echo "Expected run time (IST): 08:40 AM"
-          python main.py
-          echo "Scraper finished."
+          echo "Test run started."
+          # Log the time to confirm the frequency
+          date
+          echo "Sleeping for 5 seconds to simulate work..."
+          sleep 5
+          echo "Test run finished successfully."
