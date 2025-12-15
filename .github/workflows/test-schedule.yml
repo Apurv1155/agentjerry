@@ -1,0 +1,19 @@
+name: TEST – Scheduler Every 2 Minutes
+
+on:
+  schedule:
+    - cron: "*/2 * * * *"
+  workflow_dispatch:
+
+jobs:
+  test-job:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show date and time
+        run: |
+          echo "Scheduler test running"
+          echo "UTC time:"
+          date -u
+          echo "IST time:"
+          TZ=Asia/Kolkata date
