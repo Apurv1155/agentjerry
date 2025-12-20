@@ -1,5 +1,4 @@
 import time
-import random
 import re
 import os
 import pandas as pd
@@ -19,16 +18,12 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
-# CONFIG KEYWORDS
+# CONFIG
 # ==============================
-KEYWORDS = [
-    "wooden frame",
-    "wooden frame"
-]
-
-SEARCH_KEYWORD = random.choice(KEYWORDS)
+SEARCH_KEYWORD = "Medical disposable supplier Surat"
 MAX_RESULTS = 30
-OUTPUT_FILE = "gasket_business_leads.xlsx"
+OUTPUT_FILE = "business_leads.xlsx"
+
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 ADMIN_EMAIL = "faceapp0011@gmail.com"
@@ -38,64 +33,61 @@ RECEIVER_EMAIL = "walaapurv@gmail.com"
 # ==============================
 # HELPERS
 # ==============================
-def pause(a=2, b=5):
-    time.sleep(random.uniform(a, b))
-
 def extract_email(text):
     return list(set(EMAIL_REGEX.findall(text)))
 
+def safe_text(driver, xpath):
+    try:
+        return driver.find_element(By.XPATH, xpath).text.strip()
+    except:
+        return ""
+
 # ==============================
-# CHROME SETUP (HEADLESS)
+# HEADLESS CHROME SETUP
 # ==============================
 options = Options()
-options.add_argument("--headless=new")   # IMPORTANT
+options.add_argument("--headless=new")
 options.add_argument("--disable-gpu")
-options.add_argument("--window-size=1920,1080")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--window-size=1920,1080")
 options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_argument("--lang=en-US")
 
 driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()),
     options=options
 )
 
-wait = WebDriverWait(driver, 30)
+wait = WebDriverWait(driver, 20)
 
 # ==============================
 # GOOGLE MAPS SEARCH
 # ==============================
 driver.get("https://www.google.com/maps")
-wait.until(EC.presence_of_element_located((By.ID, "searchboxinput")))
-pause()
 
-search = driver.find_element(By.ID, "searchboxinput")
+search = wait.until(EC.presence_of_element_located((By.ID, "searchboxinput")))
 search.clear()
-for ch in SEARCH_KEYWORD:
-    search.send_keys(ch)
-    time.sleep(random.uniform(0.08, 0.18))
+search.send_keys(SEARCH_KEYWORD)
 search.send_keys(Keys.ENTER)
-pause(6, 9)
 
-results_panel = wait.until(
-    EC.presence_of_element_located((By.XPATH, '//div[@role="feed"]'))
-)
+wait.until(EC.presence_of_element_located((By.XPATH, '//div[@role="feed"]')))
+time.sleep(3)
 
 # ==============================
 # COLLECT PLACE LINKS
 # ==============================
+results_panel = driver.find_element(By.XPATH, '//div[@role="feed"]')
 place_links = set()
 
 while len(place_links) < MAX_RESULTS * 2:
     cards = driver.find_elements(By.XPATH, '//a[contains(@href,"/maps/place/")]')
-    for c in cards:
-        href = c.get_attribute("href")
+    for card in cards:
+        href = card.get_attribute("href")
         if href:
             place_links.add(href)
 
-    driver.execute_script("arguments[0].scrollTop += 1500", results_panel)
-    pause(2, 4)
+    driver.execute_script("arguments[0].scrollTop += 2500", results_panel)
+    time.sleep(1)
 
 # ==============================
 # SCRAPE BUSINESS DETAILS
@@ -116,48 +108,41 @@ for link in place_links:
         driver.switch_to.window(driver.window_handles[0])
         continue
 
-    pause(2, 4)
-    business_name = driver.find_element(By.XPATH, "//h1").text.strip()
+    business_name = safe_text(driver, "//h1")
+    phone = safe_text(driver, '//button[contains(@data-item-id,"phone")]')
+    address = safe_text(driver, '//button[@data-item-id="address"]')
 
-    def safe_text(xpath):
-        try:
-            return driver.find_element(By.XPATH, xpath).text.strip()
-        except:
-            return ""
-
-    phone = safe_text('//button[contains(@data-item-id,"phone")]')
-    address = safe_text('//button[@data-item-id="address"]')
-
-    website_links = driver.find_elements(By.XPATH, '//a[contains(@aria-label,"Website")]')
-    if not website_links or not phone:
+    website_elements = driver.find_elements(By.XPATH, '//a[contains(@aria-label,"Website")]')
+    if not website_elements or not phone:
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         continue
 
-    website_url = website_links[0].get_attribute("href")
+    website_url = website_elements[0].get_attribute("href")
+
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
 
     # ==============================
-    # VISIT WEBSITE FOR EMAIL
+    # EMAIL EXTRACTION FROM WEBSITE
     # ==============================
-    pages_to_check = [
+    pages = [
         website_url,
         website_url.rstrip("/") + "/contact",
         website_url.rstrip("/") + "/about"
     ]
 
     email_found = ""
-    source_url = ""
+    source_page = ""
 
-    for page in pages_to_check:
+    for page in pages:
         try:
             driver.get(page)
-            pause(3, 6)
+            time.sleep(2)
             emails = extract_email(driver.page_source)
             if emails:
                 email_found = emails[0]
-                source_url = page
+                source_page = page
                 break
         except:
             continue
@@ -169,14 +154,13 @@ for link in place_links:
             "Address": address,
             "Email": email_found,
             "Website": website_url,
-            "Source URL": source_url
+            "Source URL": source_page
         })
 
-pause()
 driver.quit()
 
 # ==============================
-# SAVE TO EXCEL
+# SAVE EXCEL
 # ==============================
 df = pd.DataFrame(leads)
 df.to_excel(OUTPUT_FILE, index=False)
@@ -189,18 +173,18 @@ msg["From"] = f"Jerry <{ADMIN_EMAIL}>"
 msg["To"] = RECEIVER_EMAIL
 msg["Subject"] = f"Business Leads - {SEARCH_KEYWORD}"
 
-body = f"""
-Hello Apurv Sir,
+msg.attach(MIMEText(
+    f"""Hello Apurv Sir,
 
 Please find attached the business leads collected from Google Maps.
-
 Keyword used: {SEARCH_KEYWORD}
 Total leads collected: {len(leads)}
 
 Regards,
 Jerry
-"""
-msg.attach(MIMEText(body, "plain"))
+""",
+    "plain"
+))
 
 with open(OUTPUT_FILE, "rb") as f:
     part = MIMEBase("application", "octet-stream")
@@ -216,4 +200,5 @@ server.send_message(msg)
 server.quit()
 
 os.remove(OUTPUT_FILE)
-print(f"✅ COMPLETED SUCCESSFULLY | Total leads: {len(leads)}")
+
+print(f"✅ Headless execution completed. Leads collected: {len(leads)}")
