@@ -19,22 +19,16 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
-# CONFIG KEYWORDS
+# CONFIG KEYWORDS (Ahmedabad Gasket Related)
 # ==============================
 KEYWORDS = [
-    "Pump repair Ahmedabad",
-    "Engine repair Ahmedabad",
-    "Industrial maintenance Ahmedabad",
-    "Automobile service Ahmedabad",
-    "Mechanical workshop Ahmedabad",
-    "HVAC repair Ahmedabad",
-    "Compressor service Ahmedabad",
-    "Manufacturing plant Ahmedabad",
-    "Fabrication industry Ahmedabad"
+    "Drone propellers india",
+    "Wooden furniture frame india",
+    "Steel fabrication india"
 ]
 
 SEARCH_KEYWORD = random.choice(KEYWORDS)
-MAX_RESULTS = 20
+MAX_RESULTS = 30
 OUTPUT_FILE = "gasket_business_leads.xlsx"
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
@@ -54,14 +48,11 @@ def extract_email(text):
     return list(set(emails))
 
 # ==============================
-# CHROME SETUP (HEADLESS)
+# CHROME SETUP
 # ==============================
 options = Options()
-options.add_argument("--headless=new")  # headless mode
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--start-maximized")
 options.add_argument("--disable-blink-features=AutomationControlled")
-options.add_argument("--window-size=1920,1080")
 
 driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()),
@@ -177,18 +168,18 @@ pause()
 driver.quit()
 
 # ==============================
-# SAVE TO EXCEL
+# SAVE TO EXCEL / GOOGLE SHEET
 # ==============================
 df = pd.DataFrame(leads)
 df.to_excel(OUTPUT_FILE, index=False)
 
 # ==============================
-# SEND EXCEL TO EMAIL
+# SEND EXCEL TO YOUR EMAIL
 # ==============================
 msg = MIMEMultipart()
 msg["From"] = f"Jerry <{ADMIN_EMAIL}>"
 msg["To"] = RECEIVER_EMAIL
-msg["Subject"] = f"Gasket Business Leads - {SEARCH_KEYWORD}"
+msg["Subject"] = f"Business Leads - {SEARCH_KEYWORD}"
 
 body = f"""
 Hello Apurv Sir,
@@ -216,4 +207,4 @@ server.send_message(msg)
 server.quit()
 
 os.remove(OUTPUT_FILE)
-print(f"✅ Headless extraction & email completed. Total leads: {len(leads)}")
+print(f"✅ Extraction & email completed. Total leads: {len(leads)}")
