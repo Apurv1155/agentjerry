@@ -1,4 +1,3 @@
-import time
 import re
 import os
 import pandas as pd
@@ -15,14 +14,16 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
 # CONFIG
 # ==============================
-SEARCH_KEYWORD = "Medical disposable supplier Surat"
+SEARCH_KEYWORD = "Packaging machine"
 MAX_RESULTS = 30
 OUTPUT_FILE = "business_leads.xlsx"
+PAGE_LOAD_TIMEOUT = 40  # seconds
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
@@ -42,9 +43,14 @@ def safe_text(driver, xpath):
     except:
         return ""
 
+def log(msg):
+    print(f"[INFO] {msg}")
+
 # ==============================
 # HEADLESS CHROME SETUP
 # ==============================
+log("Launching headless Chrome browser...")
+
 options = Options()
 options.add_argument("--headless=new")
 options.add_argument("--disable-gpu")
@@ -58,11 +64,13 @@ driver = webdriver.Chrome(
     options=options
 )
 
+driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)
 wait = WebDriverWait(driver, 20)
 
 # ==============================
 # GOOGLE MAPS SEARCH
 # ==============================
+log(f"Opening Google Maps and searching: {SEARCH_KEYWORD}")
 driver.get("https://www.google.com/maps")
 
 search = wait.until(EC.presence_of_element_located((By.ID, "searchboxinput")))
@@ -76,6 +84,7 @@ time.sleep(3)
 # ==============================
 # COLLECT PLACE LINKS
 # ==============================
+log("Collecting business listing URLs...")
 results_panel = driver.find_element(By.XPATH, '//div[@role="feed"]')
 place_links = set()
 
@@ -89,14 +98,20 @@ while len(place_links) < MAX_RESULTS * 2:
     driver.execute_script("arguments[0].scrollTop += 2500", results_panel)
     time.sleep(1)
 
+log(f"Collected {len(place_links)} business URLs")
+
 # ==============================
 # SCRAPE BUSINESS DETAILS
 # ==============================
 leads = []
+business_count = 0
 
 for link in place_links:
     if len(leads) >= MAX_RESULTS:
         break
+
+    business_count += 1
+    log(f"Opening business #{business_count}")
 
     driver.execute_script("window.open(arguments[0]);", link)
     driver.switch_to.window(driver.window_handles[1])
@@ -104,6 +119,7 @@ for link in place_links:
     try:
         wait.until(EC.presence_of_element_located((By.XPATH, "//h1")))
     except:
+        log("Business page failed to load, skipping.")
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         continue
@@ -112,19 +128,23 @@ for link in place_links:
     phone = safe_text(driver, '//button[contains(@data-item-id,"phone")]')
     address = safe_text(driver, '//button[@data-item-id="address"]')
 
+    log(f"Business Name: {business_name}")
+
     website_elements = driver.find_elements(By.XPATH, '//a[contains(@aria-label,"Website")]')
     if not website_elements or not phone:
+        log("No website or phone found, skipping business.")
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         continue
 
     website_url = website_elements[0].get_attribute("href")
+    log(f"Website found: {website_url}")
 
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
 
     # ==============================
-    # EMAIL EXTRACTION FROM WEBSITE
+    # CHECK WEBSITE & EXTRACT EMAIL
     # ==============================
     pages = [
         website_url,
@@ -135,16 +155,28 @@ for link in place_links:
     email_found = ""
     source_page = ""
 
+    log("Checking website pages for email...")
+
     for page in pages:
         try:
+            log(f"Loading page: {page}")
             driver.get(page)
-            time.sleep(2)
+
             emails = extract_email(driver.page_source)
             if emails:
                 email_found = emails[0]
                 source_page = page
+                log(f"Email found: {email_found}")
                 break
-        except:
+            else:
+                log("No email on this page.")
+
+        except TimeoutException:
+            log("Page load exceeded 40 seconds. Skipping this business.")
+            break
+
+        except Exception as e:
+            log(f"Error loading page: {e}")
             continue
 
     if email_found:
@@ -156,18 +188,25 @@ for link in place_links:
             "Website": website_url,
             "Source URL": source_page
         })
+        log(f"Lead collected successfully. Total leads: {len(leads)}")
+    else:
+        log("No email found for this business.")
 
+log("Scraping completed. Closing browser.")
 driver.quit()
 
 # ==============================
 # SAVE EXCEL
 # ==============================
+log("Saving leads to Excel file...")
 df = pd.DataFrame(leads)
 df.to_excel(OUTPUT_FILE, index=False)
 
 # ==============================
 # SEND EMAIL
 # ==============================
+log("Sending Excel file via email...")
+
 msg = MIMEMultipart()
 msg["From"] = f"Jerry <{ADMIN_EMAIL}>"
 msg["To"] = RECEIVER_EMAIL
@@ -201,4 +240,4 @@ server.quit()
 
 os.remove(OUTPUT_FILE)
 
-print(f"✅ Headless execution completed. Leads collected: {len(leads)}")
+log(f"Process finished successfully. Total leads collected: {len(leads)}")
