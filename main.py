@@ -22,7 +22,6 @@ from webdriver_manager.chrome import ChromeDriverManager
 # CONFIG KEYWORDS
 # ==============================
 KEYWORDS = [
-    "Motor repair Ahmedabad",
     "Pump repair Ahmedabad",
     "Engine repair Ahmedabad",
     "Industrial maintenance Ahmedabad",
@@ -31,9 +30,7 @@ KEYWORDS = [
     "HVAC repair Ahmedabad",
     "Compressor service Ahmedabad",
     "Manufacturing plant Ahmedabad",
-    "Fabrication industry Ahmedabad",
-    "Machine repair Ahmedabad",
-    "Hydraulic service Ahmedabad"
+    "Fabrication industry Ahmedabad"
 ]
 
 SEARCH_KEYWORD = random.choice(KEYWORDS)
