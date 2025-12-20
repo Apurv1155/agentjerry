@@ -2,7 +2,7 @@ import time
 import random
 import re
 import os
-import pandas as pd 
+import pandas as pd
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -19,17 +19,17 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
-# CONFIG KEYWORDS (Ahmedabad Gasket Related)
+# CONFIG KEYWORDS
 # ==============================
 KEYWORDS = [
-    "Drone propellers india",
-    "Wooden furniture frame india",
-    "Steel fabrication india"
+    "Drone propellers India",
+    "Wooden furniture frame India",
+    "Steel fabrication India",
 ]
 
 SEARCH_KEYWORD = random.choice(KEYWORDS)
 MAX_RESULTS = 30
-OUTPUT_FILE = "gasket_business_leads.xlsx"
+OUTPUT_FILE = "business_leads.xlsx"
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
 # Email account to send Excel
@@ -48,11 +48,14 @@ def extract_email(text):
     return list(set(emails))
 
 # ==============================
-# CHROME SETUP
+# CHROME SETUP (HEADLESS)
 # ==============================
 options = Options()
-options.add_argument("--start-maximized")
+options.add_argument("--headless=new")  # headless mode
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
 options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--window-size=1920,1080")
 
 driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()),
@@ -168,13 +171,14 @@ pause()
 driver.quit()
 
 # ==============================
-# SAVE TO EXCEL / GOOGLE SHEET
+# SAVE TO EXCEL - SHEET NAME: Business Leads
 # ==============================
 df = pd.DataFrame(leads)
-df.to_excel(OUTPUT_FILE, index=False)
+with pd.ExcelWriter(OUTPUT_FILE) as writer:
+    df.to_excel(writer, sheet_name="Business Leads", index=False)
 
 # ==============================
-# SEND EXCEL TO YOUR EMAIL
+# SEND EXCEL TO EMAIL
 # ==============================
 msg = MIMEMultipart()
 msg["From"] = f"Jerry <{ADMIN_EMAIL}>"
@@ -184,7 +188,7 @@ msg["Subject"] = f"Business Leads - {SEARCH_KEYWORD}"
 body = f"""
 Hello Apurv Sir,
 
-Please find attached the gasket-related business leads collected from Google Maps.
+Please find attached the business leads collected from Google Maps.
 Keyword used: {SEARCH_KEYWORD}
 Total leads collected: {len(leads)}
 
@@ -207,4 +211,4 @@ server.send_message(msg)
 server.quit()
 
 os.remove(OUTPUT_FILE)
-print(f"✅ Extraction & email completed. Total leads: {len(leads)}")
+print(f"✅ Headless extraction & email completed. Total leads: {len(leads)}")
