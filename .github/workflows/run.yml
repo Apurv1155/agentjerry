@@ -1,0 +1,35 @@
+name: Daily Google Maps Leads
+
+on:
+  schedule:
+    - cron: "30 1 * * *"   # 07:00 AM IST
+  workflow_dispatch:
+
+jobs:
+  run-scraper:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        env:
+          TZ: Asia/Kolkata
+        run: |
+          echo "Starting scheduled scraper execution"
+          echo "UTC time:"
+          date -u
+          echo "IST time:"
+          date
+          python main.py
