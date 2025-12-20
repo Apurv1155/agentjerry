@@ -1,8 +1,9 @@
 import time
+import random
+import re
+import os
 import pandas as pd
 import smtplib
-import random
-import os
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -18,42 +19,52 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 # ==============================
-# RANDOM KEYWORDS
+# CONFIG KEYWORDS
 # ==============================
 KEYWORDS = [
-    "cafes in Ahmedabad",
-    "restaurants in Ahmedabad",
-    "salon in Ahmedabad",
-    "beauty parlour in Ahmedabad",
-    "gym in Ahmedabad",
-    "coaching classes in Ahmedabad",
-    "spa in Ahmedabad",
-    "bakery in Ahmedabad",
-    "mobile repair shop Ahmedabad",
-    "dental clinic Ahmedabad"
+    "Motor repair Ahmedabad",
+    "Pump repair Ahmedabad",
+    "Engine repair Ahmedabad",
+    "Industrial maintenance Ahmedabad",
+    "Automobile service Ahmedabad",
+    "Mechanical workshop Ahmedabad",
+    "HVAC repair Ahmedabad",
+    "Compressor service Ahmedabad",
+    "Manufacturing plant Ahmedabad",
+    "Fabrication industry Ahmedabad",
+    "Machine repair Ahmedabad",
+    "Hydraulic service Ahmedabad"
 ]
 
-keyword = random.choice(KEYWORDS)
+SEARCH_KEYWORD = random.choice(KEYWORDS)
 MAX_RESULTS = 20
-OUTPUT_FILE = "leads.xlsx"
+OUTPUT_FILE = "gasket_business_leads.xlsx"
+EMAIL_REGEX = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
 
-# ==============================
-# SMTP (FROM GITHUB SECRETS)
-# ==============================
+# Email account to send Excel
 ADMIN_EMAIL = "faceapp0011@gmail.com"
 ADMIN_PASSWORD = "ytup bjrd pupf tuuj"
 RECEIVER_EMAIL = "walaapurv@gmail.com"
 
+# ==============================
+# HELPER FUNCTIONS
+# ==============================
+def pause(a=2, b=5):
+    time.sleep(random.uniform(a, b))
+
+def extract_email(text):
+    emails = EMAIL_REGEX.findall(text)
+    return list(set(emails))
 
 # ==============================
-# HEADLESS CHROME (CLOUD SAFE)
+# CHROME SETUP (HEADLESS)
 # ==============================
 options = Options()
-options.add_argument("--headless=new")
+options.add_argument("--headless=new")  # headless mode
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--window-size=1920,1080")
 options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--window-size=1920,1080")
 
 driver = webdriver.Chrome(
     service=Service(ChromeDriverManager().install()),
@@ -66,11 +77,14 @@ wait = WebDriverWait(driver, 30)
 # ==============================
 driver.get("https://www.google.com/maps")
 wait.until(EC.presence_of_element_located((By.ID, "searchboxinput")))
+pause()
 
 search = driver.find_element(By.ID, "searchboxinput")
-search.send_keys(keyword)
+for ch in SEARCH_KEYWORD:
+    search.send_keys(ch)
+    time.sleep(random.uniform(0.1, 0.25))
 search.send_keys(Keys.ENTER)
-time.sleep(10)
+pause(6, 9)
 
 results_panel = wait.until(
     EC.presence_of_element_located((By.XPATH, '//div[@role="feed"]'))
@@ -89,10 +103,10 @@ while len(place_links) < MAX_RESULTS * 2:
             place_links.add(href)
 
     driver.execute_script("arguments[0].scrollTop += 1500", results_panel)
-    time.sleep(2)
+    pause(2, 4)
 
 # ==============================
-# SCRAPE DETAILS
+# SCRAPE BUSINESS DETAILS
 # ==============================
 leads = []
 
@@ -110,68 +124,85 @@ for link in place_links:
         driver.switch_to.window(driver.window_handles[0])
         continue
 
-    time.sleep(2)
+    pause(2, 4)
+    business_name = driver.find_element(By.XPATH, "//h1").text.strip()
 
-    name = driver.find_element(By.XPATH, "//h1").text.strip()
-
-    def safe(xpath):
+    def safe_text(xpath):
         try:
             return driver.find_element(By.XPATH, xpath).text.strip()
         except:
             return ""
 
-    phone = safe('//button[contains(@data-item-id,"phone")]')
-    address = safe('//button[@data-item-id="address"]')
-    rating = safe('//div[contains(@aria-label,"stars")]')
+    phone = safe_text('//button[contains(@data-item-id,"phone")]')
+    address = safe_text('//button[@data-item-id="address"]')
 
-    if not phone:
+    website_links = driver.find_elements(By.XPATH, '//a[contains(@aria-label,"Website")]')
+    if not website_links or not phone:
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
         continue
 
-    if driver.find_elements(By.XPATH, '//a[contains(@aria-label,"Website")]'):
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])
-        continue
-
-    leads.append({
-        "Business Name": name,
-        "Mobile Number": phone,
-        "Address": address,
-        "Google Maps Link": link,
-        "Rating": rating
-    })
-
+    website_url = website_links[0].get_attribute("href")
     driver.close()
     driver.switch_to.window(driver.window_handles[0])
 
+    # Visit website pages to find emails
+    pages_to_check = [
+        website_url,
+        website_url.rstrip("/") + "/contact",
+        website_url.rstrip("/") + "/about"
+    ]
+
+    email_found = ""
+    for page in pages_to_check:
+        try:
+            driver.get(page)
+            pause(3, 6)
+            page_source = driver.page_source
+            emails = extract_email(page_source)
+            if emails:
+                email_found = emails[0]
+                break
+        except:
+            continue
+
+    if email_found:
+        leads.append({
+            "Business Name": business_name,
+            "Phone": phone,
+            "Address": address,
+            "Email": email_found,
+            "Website": website_url,
+            "Source URL": page
+        })
+
+pause()
 driver.quit()
 
 # ==============================
-# CREATE TEMP EXCEL
+# SAVE TO EXCEL
 # ==============================
 df = pd.DataFrame(leads)
 df.to_excel(OUTPUT_FILE, index=False)
 
 # ==============================
-# SEND EMAIL
+# SEND EXCEL TO EMAIL
 # ==============================
 msg = MIMEMultipart()
-msg["From"] = "Jerry <{}>".format(ADMIN_EMAIL)
+msg["From"] = f"Jerry <{ADMIN_EMAIL}>"
 msg["To"] = RECEIVER_EMAIL
-msg["Subject"] = "Today's Google Maps Leads Catalogue"
+msg["Subject"] = f"Gasket Business Leads - {SEARCH_KEYWORD}"
 
 body = f"""
-Hi Apurv Sir,
+Hello Apurv Sir,
 
-This is today’s leads catalogue ({keyword}).
-
-Please find the attached file.
+Please find attached the gasket-related business leads collected from Google Maps.
+Keyword used: {SEARCH_KEYWORD}
+Total leads collected: {len(leads)}
 
 Regards,
 Jerry
 """
-
 msg.attach(MIMEText(body, "plain"))
 
 with open(OUTPUT_FILE, "rb") as f:
@@ -188,4 +219,4 @@ server.send_message(msg)
 server.quit()
 
 os.remove(OUTPUT_FILE)
-print("✅ Email sent & temp file removed")
+print(f"✅ Headless extraction & email completed. Total leads: {len(leads)}")
